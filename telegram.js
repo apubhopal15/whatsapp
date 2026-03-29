@@ -27,8 +27,11 @@ async function notifyForApproval({ msgId, from, userText, aiReply }) {
 
   const buttons = [
     [
-      { text: '✅ Approve', callback_data: `APPROVE_${msgId}` },
+      { text: '✅ Approve AI Reply', callback_data: `APPROVE_${msgId}` },
       { text: '❌ Reject', callback_data: `REJECT_${msgId}` }
+    ],
+    [
+      { text: '✏️ Edit & Send Custom Reply', callback_data: `EDIT_${msgId}` }
     ]
   ];
 
@@ -47,12 +50,22 @@ async function handleTelegramUpdate(body, sendWhatsAppFn) {
       if (msg) {
         await sendWhatsAppFn(msg.from, msg.aiReply);
         db.updateStatus(id, 'approved');
-        await sendTelegram(chatId, `✅ Sent to +${msg.from}!`);
+        await sendTelegram(chatId, `✅ AI reply sent to +${msg.from}!`);
       }
+
     } else if (data.startsWith('REJECT_')) {
       const id = parseInt(data.split('_')[1]);
       db.updateStatus(id, 'rejected');
       await sendTelegram(chatId, `❌ Message ${id} rejected.`);
+
+    } else if (data.startsWith('EDIT_')) {
+      const id = parseInt(data.split('_')[1]);
+      const msg = db.getMessage(id);
+      if (msg) {
+        await sendTelegram(chatId,
+          `✏️ Custom reply bhejo — yeh format use karo:\n\nREPLY_${id} tumhari reply yahan likho\n\nExample:\nREPLY_${id} Kal tak ho jayega kaam`
+        );
+      }
     }
 
     await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
@@ -71,17 +84,20 @@ async function handleTelegramUpdate(body, sendWhatsAppFn) {
 
   if (text === '/start' || text === '/help') {
     await sendTelegram(chatId,
-      `🤖 WhatsApp Bot Commands:\n\nEDIT <id> custom text\n\nExample:\nEDIT 5 Kal tak ho jayega`
+      `🤖 WhatsApp Bot Ready!\n\nButtons se karo:\n✅ Approve — AI reply bhejo\n✏️ Edit — Custom reply bhejo\n❌ Reject — Discard karo`
     );
-  } else if (text.startsWith('EDIT ')) {
+
+  } else if (text.startsWith('REPLY_')) {
     const parts = text.split(' ');
-    const id = parseInt(parts[1]);
-    const customReply = parts.slice(2).join(' ');
+    const id = parseInt(parts[0].split('_')[1]);
+    const customReply = parts.slice(1).join(' ');
     const msg = db.getMessage(id);
     if (msg && customReply) {
       await sendWhatsAppFn(msg.from, customReply);
       db.updateStatus(id, 'edited');
       await sendTelegram(chatId, `✅ Custom reply sent to +${msg.from}!`);
+    } else {
+      await sendTelegram(chatId, '❌ Format galat hai! REPLY_1 tumhari reply yahan');
     }
   }
 }
