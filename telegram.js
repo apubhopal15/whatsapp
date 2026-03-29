@@ -3,7 +3,6 @@ require('dotenv').config();
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 const YOUR_TELEGRAM_ID = process.env.YOUR_TELEGRAM_ID;
 const db = require('./database');
-const { sendWhatsApp } = require('./whatsapp');
 
 async function sendTelegram(chatId, text, buttons) {
   const body = { chat_id: chatId, text: text };
@@ -34,17 +33,9 @@ async function notifyForApproval({ msgId, from, userText, aiReply }) {
   ];
 
   await sendTelegram(YOUR_TELEGRAM_ID, text, buttons);
-
-  await sendTelegram(YOUR_TELEGRAM_ID, text, buttons);
 }
-    `━━━━━━━━━━━━━━━━━━━━\n` +
-    `Reply with:\n` +
-    `✅ APPROVE ${msgId}\n` +
-    `✏️ EDIT ${msgId} your custom reply\n` +
-    `❌ REJECT ${msgId}`;
 
- async function handleTelegramUpdate(body, sendWhatsAppFn) {
-  // Handle button clicks
+async function handleTelegramUpdate(body, sendWhatsAppFn) {
   if (body.callback_query) {
     const query = body.callback_query;
     const chatId = query.message.chat.id.toString();
@@ -64,7 +55,6 @@ async function notifyForApproval({ msgId, from, userText, aiReply }) {
       await sendTelegram(chatId, `❌ Message ${id} rejected.`);
     }
 
-    // Answer callback query
     await fetch(`https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -73,7 +63,6 @@ async function notifyForApproval({ msgId, from, userText, aiReply }) {
     return;
   }
 
-  // Handle text messages
   const message = body?.message;
   if (!message) return;
   const chatId = message.chat.id.toString();
@@ -82,7 +71,7 @@ async function notifyForApproval({ msgId, from, userText, aiReply }) {
 
   if (text === '/start' || text === '/help') {
     await sendTelegram(chatId,
-      `🤖 WhatsApp Bot Commands:\n\nAPPROVE <id>\nEDIT <id> custom text\nREJECT <id>`
+      `🤖 WhatsApp Bot Commands:\n\nEDIT <id> custom text\n\nExample:\nEDIT 5 Kal tak ho jayega`
     );
   } else if (text.startsWith('EDIT ')) {
     const parts = text.split(' ');
@@ -92,7 +81,7 @@ async function notifyForApproval({ msgId, from, userText, aiReply }) {
     if (msg && customReply) {
       await sendWhatsAppFn(msg.from, customReply);
       db.updateStatus(id, 'edited');
-      await sendTelegram(chatId, `✅ Custom reply sent!`);
+      await sendTelegram(chatId, `✅ Custom reply sent to +${msg.from}!`);
     }
   }
 }
