@@ -3,12 +3,10 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 require('dotenv').config();
-
 const { getAIReply } = require('./ai');
 const { notifyForApproval, handleTelegramUpdate } = require('./telegram');
 const db = require('./database');
 const twilio = require('twilio');
-
 const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
 const AUTO_SEND_PATTERNS = [
@@ -36,13 +34,8 @@ app.post('/webhook', async (req, res) => {
     const from = req.body.From.replace('whatsapp:', '');
     console.log(`📩 From ${from}: ${userText}`);
     const aiReply = await getAIReply(userText);
-    if (isAutoSend(userText)) {
-      await sendWhatsApp(from, aiReply);
-      console.log('✅ Auto-sent');
-    } else {
-      const msgId = db.saveMessage({ from, userText, aiReply });
-      await notifyForApproval({ msgId, from, userText, aiReply });
-    }
+    const msgId = db.saveMessage({ from, userText, aiReply });
+    await notifyForApproval({ msgId, from, userText, aiReply }, sendWhatsApp); // 👈 UPDATED
     res.sendStatus(200);
   } catch (err) {
     console.error('❌ Error:', err.message);
@@ -56,5 +49,4 @@ app.post('/telegram', async (req, res) => {
 });
 
 app.get('/', (req, res) => res.json({ status: '✅ Bot running' }));
-
 app.listen(process.env.PORT || 3000, () => console.log('🚀 Server running on port 3000'));
